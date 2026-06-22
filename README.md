@@ -1,4 +1,4 @@
-# Monitoring Lake Urmia Surface Water Changes (1985–2025) using Google Earth Engine
+# Monitoring Lake Urmia Surface Water Changes (1984–2021) using Google Earth Engine
 
 This project utilizes Google Earth Engine (GEE) to analyze and visualize the dramatic changes in the surface water area of Lake Urmia over the past few decades. By leveraging the **JRC Global Surface Water Dataset**, the script calculates yearly surface area, maps water occurrence, and compares historical extents to highlight the ecological changes in the region.
 
