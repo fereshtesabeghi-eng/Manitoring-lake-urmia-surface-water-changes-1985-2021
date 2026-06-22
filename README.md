@@ -9,7 +9,7 @@ Lake Urmia, located in northwestern Iran, was once one of the largest hypersalin
 ### Key Features
 * **Water Occurrence Mapping:** Visualizes the long-term probability of finding water in the Lake Urmia basin.
 * **Time-Series Analysis:** Calculates the total surface water area (in km²) for each year and generates an interactive line chart.
-* **Temporal Comparisons:** Visually compares the lake's extent during a healthy year (1998) versus a depleted year (2021).
+* **Temporal Comparisons:** Visually compares the lake's extent during a healthy year (1984) versus a depleted year (2021).
 * **Automated Data Export:** Exports the time-series area data as a `.csv` and the generated maps as images directly to Google Drive.
 
 ---
@@ -26,10 +26,10 @@ This map highlights the frequency of water presence. Deep blue areas represent p
 
 ![Lake Urmia Occurrence Map](occurance.png)
 
-### 3. Comparing 1998 vs. 2021
+### 3. Comparing 1984 vs. 2021
 A stark visual comparison showing the lake's extent before the most severe shrinkage (1998) and its depleted state in recent years (2021).
 
-| 1998 Extent | 2021 Extent |
+| 1984 Extent | 2021 Extent |
 | :---: | :---: |
 | ![Lake Urmia 1998](1998.png) | ![Lake Urmia 2021](2021.png) |
 | *Healthy water levels with a broad surface area.* | *Severe shrinkage, leaving behind vast seasonal and dry areas.* |
