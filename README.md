@@ -40,7 +40,7 @@ A stark visual comparison showing the lake's extent before the most severe shrin
 
 Below is the complete JavaScript code used for this analysis. You can run this directly in the [Google Earth Engine Code Editor](https://code.earthengine.google.com/).
 
-```javascript
+```JavaScript
 var dataset = ee.Image('JRC/GSW1_4/GlobalSurfaceWater');
 
 var visualization = {
@@ -53,18 +53,26 @@ var visualization = {
 Map.setCenter(59.414, 45.182, 6);
 
 Map.addLayer(dataset, visualization, 'Occurrence');
+// Define the region of interest for Lake Urmia
 var geometry = ee.Geometry.Rectangle([44.8, 37.0, 45.7, 38.3]);
+Map.centerObject(geometry, 8);
+
+// Step 1: Load and visualize water occurrence
 var gsw = ee.Image("JRC/GSW1_4/GlobalSurfaceWater");
 var occurrence = gsw.select("occurrence").clip(geometry);
-var vis = {
+
+var visOccurrence = {
   min: 0,
   max: 100,
   palette: ['ffffff', 'ffbbbb', '0000ff']
 };
-Map.centerObject(geometry, 8);
-Map.addLayer(occurrence, vis, "Occurrence");
+Map.addLayer(occurrence, visOccurrence, "Water Occurrence Map");
+
+// Step 2: Create a water mask (Occurrence > 50%)
 var water = occurrence.gt(50);
-Map.addLayer(water, {palette: ['white', 'blue']}, "Water Mask");
+Map.addLayer(water, {palette: ['white', 'blue']}, "Water Mask (>50% occurrence)", false);
+
+// Step 3: Calculate base statistics for >50% occurrence
 var areaImage = water.multiply(ee.Image.pixelArea());
 var stats = areaImage.reduceRegion({
   reducer: ee.Reducer.sum(),
@@ -72,21 +80,26 @@ var stats = areaImage.reduceRegion({
   scale: 30,
   maxPixels: 1e13
 });
-print("Lake Area (m²):", stats);
+print("Base Lake Area >50% Occurrence (m²):", stats);
 
-// Step 6: Yearly area calculation
-var yearlyCollection = ee.ImageCollection("JRC/GSW1_4/YearlyHistory");
+// Step 4: Yearly area calculation (Strictly 1984 - 2021)
+var yearlyCollection = ee.ImageCollection("JRC/GSW1_4/YearlyHistory")
+  .filterDate('1984-01-01', '2022-01-01'); // Ensures strict inclusion of 1984 through 2021
 
 var calculateArea = function(image) {
+  // Class 2 is seasonal water, Class 3 is permanent water
   var water = image.select("waterClass").eq(2).or(image.select("waterClass").eq(3));
   var areaImage = water.multiply(ee.Image.pixelArea());
+  
   var stats = areaImage.reduceRegion({
     reducer: ee.Reducer.sum(),
     geometry: geometry,
     scale: 30,
     maxPixels: 1e13
   });
+  
   var year = image.get("year");
+  
   return ee.Feature(null, {
     "year": year,
     "area_m2": stats.get("waterClass"),
@@ -101,12 +114,12 @@ var clippedCollection = yearlyCollection.map(function(img) {
 var areaFeatures = ee.FeatureCollection(clippedCollection.map(calculateArea));
 print("Yearly Lake Area Table:", areaFeatures);
 
-// Step 7: Chart
+// Step 5: Generate Chart
 var chart = ui.Chart.feature.byFeature(areaFeatures, "year", "area_km2")
   .setChartType("LineChart")
   .setOptions({
-    title: "Lake Urmia Surface Water Area (1985–2025)",
-    hAxis: {title: "Year"},
+    title: "Lake Urmia Surface Water Area (1984-2021)",
+    hAxis: {title: "Year", format: '####'},
     vAxis: {title: "Area (km²)"},
     lineWidth: 2,
     pointSize: 4,
@@ -114,23 +127,37 @@ var chart = ui.Chart.feature.byFeature(areaFeatures, "year", "area_km2")
   });
 print(chart);
 
-// Step 8: Key-year comparison
-var keyYears = [1990, 2000, 2010, 2020, 2021];
+// Step 6: Key-year comparison
+var keyYears = [1984, 1990, 2000, 2010, 2020, 2021];
 var keyYearFeatures = areaFeatures.filter(
   ee.Filter.inList("year", keyYears)
 );
-print("Key Year Comparison:", keyYearFeatures);
+print("Key Year Comparison Data:", keyYearFeatures);
 
+// Step 7: Load Start and End Years for visual comparison maps (1984 vs 2021)
+var img1984 = ee.Image("JRC/GSW1_4/YearlyHistory/1984").select("waterClass").clip(geometry);
+var img2021 = ee.Image("JRC/GSW1_4/YearlyHistory/2021").select("waterClass").clip(geometry);
+
+var visClass = {
+  min: 0, max: 3,
+  palette: ['000000', 'd2b48c', '99d9ea', '0000ff']
+  // 0=no data(black), 1=not water(tan), 2=seasonal(light blue), 3=permanent(blue)
+};
+
+Map.addLayer(img1984, visClass, "Lake Urmia 1984 (Start)");
+Map.addLayer(img2021, visClass, "Lake Urmia 2021 (End)");
+
+// Step 8: Export Data and Maps to Google Drive
 Export.table.toDrive({
   collection: areaFeatures,
   description: "LakeUrmia_YearlyArea_1984_2021",
   folder: "EarthEngineExports",
-  fileNamePrefix: "lake_urmia_yearly_area",
+  fileNamePrefix: "LakeUrmia_YearlyArea_1984_2021",
   fileFormat: "CSV"
 });
 
 Export.image.toDrive({
-  image: occurrence.visualize(vis),
+  image: occurrence.visualize(visOccurrence),
   description: "LakeUrmia_OccurrenceMap",
   folder: "EarthEngineExports",
   fileNamePrefix: "lake_urmia_occurrence_map",
@@ -139,10 +166,22 @@ Export.image.toDrive({
   maxPixels: 1e13
 });
 
-var img1998 = ee.Image("JRC/GSW1_4/YearlyHistory/1998").select("waterClass").clip(geometry);
-var img2021 = ee.Image("JRC/GSW1_4/YearlyHistory/2021").select("waterClass").clip(geometry);
+Export.image.toDrive({
+  image: img1984.visualize(visClass),
+  description: "LakeUrmia_WaterClass_1984",
+  folder: "EarthEngineExports",
+  fileNamePrefix: "lake_urmia_1984_map",
+  region: geometry,
+  scale: 30,
+  maxPixels: 1e13
+});
 
-var visClass = {
-  min: 0, max: 3,
-  palette: ['000000', 'd2b48c', '99d9ea', '0000ff']
-  // 0=no data(black), 1=not water(tan), 2=seasonal
+Export.image.toDrive({
+  image: img2021.visualize(visClass),
+  description: "LakeUrmia_WaterClass_2021",
+  folder: "EarthEngineExports",
+  fileNamePrefix: "lake_urmia_2021_map",
+  region: geometry,
+  scale: 30,
+  maxPixels: 1e13
+});
