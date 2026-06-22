@@ -20,7 +20,7 @@ Lake Urmia, located in northwestern Iran, was once one of the largest hypersalin
 The chart below illustrates the historical trajectory of Lake Urmia's surface area, showing drastic drops and extreme fluctuations over the years.
 
 ![Lake Urmia Surface Water Area Chart](ee-chart.png)
-
+ 
 ### 2. Historical Water Occurrence
 This map highlights the frequency of water presence. Deep blue areas represent permanent water bodies, while lighter/reddish areas indicate seasonal or rare water presence.
 
