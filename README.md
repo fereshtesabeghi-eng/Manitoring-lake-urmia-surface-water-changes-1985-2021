@@ -1,10 +1,3 @@
-Here is a comprehensive and structured `README.md` file for your GitHub repository. It incorporates the project title, describes the workflow of your Google Earth Engine (GEE) script, and includes placeholders for the images you provided.
-
-To use this, simply copy the text below into your `README.md` file and ensure the image files (`ee-chart.png`, `occurance.png`, `1998.png`, `2021.png`) are uploaded to the root of your repository.
-
----
-
-```markdown
 # Monitoring Lake Urmia Surface Water Changes (1985–2025) using Google Earth Engine
 
 This project utilizes Google Earth Engine (GEE) to analyze and visualize the dramatic changes in the surface water area of Lake Urmia over the past few decades. By leveraging the **JRC Global Surface Water Dataset**, the script calculates yearly surface area, maps water occurrence, and compares historical extents to highlight the ecological changes in the region.
@@ -43,32 +36,113 @@ A stark visual comparison showing the lake's extent before the most severe shrin
 
 ---
 
-## 🛠️ Data Sources
+## 💻 Google Earth Engine Script
 
-* **Dataset:** [JRC Global Surface Water Mapping Layers, v1.4](https://developers.google.com/earth-engine/datasets/catalog/JRC_GSW1_4_GlobalSurfaceWater)
-* **Yearly History:** [JRC Global Surface Water Yearly History, v1.4](https://developers.google.com/earth-engine/datasets/catalog/JRC_GSW1_4_YearlyHistory)
-* **Scale:** 30 meters
-* **Timeframe:** 1984 – 2021 (Dataset coverage limit)
+Below is the complete JavaScript code used for this analysis. You can run this directly in the [Google Earth Engine Code Editor](https://code.earthengine.google.com/).
 
----
+```javascript
+var dataset = ee.Image('JRC/GSW1_4/GlobalSurfaceWater');
 
-## 🚀 How to Run the Code
+var visualization = {
+  bands: ['occurrence'],
+  min: 0.0,
+  max: 100.0,
+  palette: ['ffffff', 'ffbbbb', '0000ff']
+};
 
-1.  Sign up for a [Google Earth Engine](https://earthengine.google.com/) account if you don't already have one.
-2.  Open the [Google Earth Engine Code Editor](https://code.earthengine.google.com/).
-3.  Copy the JavaScript code from this repository and paste it into the code editor.
-4.  Click **Run** to execute the script.
-5.  Check the **Console** tab to view the calculated yearly area, the generated chart, and specific key-year comparisons.
-6.  Go to the **Tasks** tab to run the export tasks, which will save the `.csv` data and map images directly to your connected Google Drive folder (`EarthEngineExports`).
+Map.setCenter(59.414, 45.182, 6);
 
----
+Map.addLayer(dataset, visualization, 'Occurrence');
+var geometry = ee.Geometry.Rectangle([44.8, 37.0, 45.7, 38.3]);
+var gsw = ee.Image("JRC/GSW1_4/GlobalSurfaceWater");
+var occurrence = gsw.select("occurrence").clip(geometry);
+var vis = {
+  min: 0,
+  max: 100,
+  palette: ['ffffff', 'ffbbbb', '0000ff']
+};
+Map.centerObject(geometry, 8);
+Map.addLayer(occurrence, vis, "Occurrence");
+var water = occurrence.gt(50);
+Map.addLayer(water, {palette: ['white', 'blue']}, "Water Mask");
+var areaImage = water.multiply(ee.Image.pixelArea());
+var stats = areaImage.reduceRegion({
+  reducer: ee.Reducer.sum(),
+  geometry: geometry,
+  scale: 30,
+  maxPixels: 1e13
+});
+print("Lake Area (m²):", stats);
 
-## 📂 Exported Outputs
+// Step 6: Yearly area calculation
+var yearlyCollection = ee.ImageCollection("JRC/GSW1_4/YearlyHistory");
 
-Running the export tasks will generate the following files in your Google Drive:
-1.  `lake_urmia_yearly_area.csv` - The time-series data of the lake's area in square kilometers.
-2.  `lake_urmia_occurrence_map.tif` - The spatial map of water occurrence probabilities.
-3.  `lake_urmia_1998.tif` - The classified water extent map for 1998.
-4.  `lake_urmia_2021.tif` - The classified water extent map for 2021.
+var calculateArea = function(image) {
+  var water = image.select("waterClass").eq(2).or(image.select("waterClass").eq(3));
+  var areaImage = water.multiply(ee.Image.pixelArea());
+  var stats = areaImage.reduceRegion({
+    reducer: ee.Reducer.sum(),
+    geometry: geometry,
+    scale: 30,
+    maxPixels: 1e13
+  });
+  var year = image.get("year");
+  return ee.Feature(null, {
+    "year": year,
+    "area_m2": stats.get("waterClass"),
+    "area_km2": ee.Number(stats.get("waterClass")).divide(1e6)
+  });
+};
 
-```
+var clippedCollection = yearlyCollection.map(function(img) {
+  return img.clip(geometry);
+});
+
+var areaFeatures = ee.FeatureCollection(clippedCollection.map(calculateArea));
+print("Yearly Lake Area Table:", areaFeatures);
+
+// Step 7: Chart
+var chart = ui.Chart.feature.byFeature(areaFeatures, "year", "area_km2")
+  .setChartType("LineChart")
+  .setOptions({
+    title: "Lake Urmia Surface Water Area (1985–2025)",
+    hAxis: {title: "Year"},
+    vAxis: {title: "Area (km²)"},
+    lineWidth: 2,
+    pointSize: 4,
+    colors: ["0000ff"]
+  });
+print(chart);
+
+// Step 8: Key-year comparison
+var keyYears = [1990, 2000, 2010, 2020, 2021];
+var keyYearFeatures = areaFeatures.filter(
+  ee.Filter.inList("year", keyYears)
+);
+print("Key Year Comparison:", keyYearFeatures);
+
+Export.table.toDrive({
+  collection: areaFeatures,
+  description: "LakeUrmia_YearlyArea_1984_2021",
+  folder: "EarthEngineExports",
+  fileNamePrefix: "lake_urmia_yearly_area",
+  fileFormat: "CSV"
+});
+
+Export.image.toDrive({
+  image: occurrence.visualize(vis),
+  description: "LakeUrmia_OccurrenceMap",
+  folder: "EarthEngineExports",
+  fileNamePrefix: "lake_urmia_occurrence_map",
+  region: geometry,
+  scale: 30,
+  maxPixels: 1e13
+});
+
+var img1998 = ee.Image("JRC/GSW1_4/YearlyHistory/1998").select("waterClass").clip(geometry);
+var img2021 = ee.Image("JRC/GSW1_4/YearlyHistory/2021").select("waterClass").clip(geometry);
+
+var visClass = {
+  min: 0, max: 3,
+  palette: ['000000', 'd2b48c', '99d9ea', '0000ff']
+  // 0=no data(black), 1=not water(tan), 2=seasonal
